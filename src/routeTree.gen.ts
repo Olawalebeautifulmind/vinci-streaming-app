@@ -18,9 +18,11 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegistryRouteImport } from './routes/registry'
 import { Route as VersusRouteImport } from './routes/versus'
 import { Route as CSlugRouteImport } from './routes/c.$slug'
+import { Route as CertificateSerialRouteImport } from './routes/certificate.$serial'
 import { Route as CreatorHandleRouteImport } from './routes/creator.$handle'
 import { Route as LiveNewRouteImport } from './routes/live.new'
 import { Route as StreamIdRouteImport } from './routes/stream.$id'
+import { Route as StudioIdRouteImport } from './routes/studio.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -67,6 +69,11 @@ const CSlugRoute = CSlugRouteImport.update({
   path: '/c/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CertificateSerialRoute = CertificateSerialRouteImport.update({
+  id: '/certificate/$serial',
+  path: '/certificate/$serial',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CreatorHandleRoute = CreatorHandleRouteImport.update({
   id: '/creator/$handle',
   path: '/creator/$handle',
@@ -82,6 +89,11 @@ const StreamIdRoute = StreamIdRouteImport.update({
   path: '/stream/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioIdRoute = StudioIdRouteImport.update({
+  id: '/studio/$id',
+  path: '/studio/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -93,9 +105,11 @@ export interface FileRoutesByFullPath {
   '/registry': typeof RegistryRoute
   '/versus': typeof VersusRoute
   '/c/$slug': typeof CSlugRoute
+  '/certificate/$serial': typeof CertificateSerialRoute
   '/creator/$handle': typeof CreatorHandleRoute
   '/live/new': typeof LiveNewRoute
   '/stream/$id': typeof StreamIdRoute
+  '/studio/$id': typeof StudioIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -107,9 +121,11 @@ export interface FileRoutesByTo {
   '/registry': typeof RegistryRoute
   '/versus': typeof VersusRoute
   '/c/$slug': typeof CSlugRoute
+  '/certificate/$serial': typeof CertificateSerialRoute
   '/creator/$handle': typeof CreatorHandleRoute
   '/live/new': typeof LiveNewRoute
   '/stream/$id': typeof StreamIdRoute
+  '/studio/$id': typeof StudioIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -122,9 +138,11 @@ export interface FileRoutesById {
   '/registry': typeof RegistryRoute
   '/versus': typeof VersusRoute
   '/c/$slug': typeof CSlugRoute
+  '/certificate/$serial': typeof CertificateSerialRoute
   '/creator/$handle': typeof CreatorHandleRoute
   '/live/new': typeof LiveNewRoute
   '/stream/$id': typeof StreamIdRoute
+  '/studio/$id': typeof StudioIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -138,9 +156,11 @@ export interface FileRouteTypes {
     | '/registry'
     | '/versus'
     | '/c/$slug'
+    | '/certificate/$serial'
     | '/creator/$handle'
     | '/live/new'
     | '/stream/$id'
+    | '/studio/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -152,9 +172,11 @@ export interface FileRouteTypes {
     | '/registry'
     | '/versus'
     | '/c/$slug'
+    | '/certificate/$serial'
     | '/creator/$handle'
     | '/live/new'
     | '/stream/$id'
+    | '/studio/$id'
   id:
     | '__root__'
     | '/'
@@ -166,9 +188,11 @@ export interface FileRouteTypes {
     | '/registry'
     | '/versus'
     | '/c/$slug'
+    | '/certificate/$serial'
     | '/creator/$handle'
     | '/live/new'
     | '/stream/$id'
+    | '/studio/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -181,9 +205,11 @@ export interface RootRouteChildren {
   RegistryRoute: typeof RegistryRoute
   VersusRoute: typeof VersusRoute
   CSlugRoute: typeof CSlugRoute
+  CertificateSerialRoute: typeof CertificateSerialRoute
   CreatorHandleRoute: typeof CreatorHandleRoute
   LiveNewRoute: typeof LiveNewRoute
   StreamIdRoute: typeof StreamIdRoute
+  StudioIdRoute: typeof StudioIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -251,6 +277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/certificate/$serial': {
+      id: '/certificate/$serial'
+      path: '/certificate/$serial'
+      fullPath: '/certificate/$serial'
+      preLoaderRoute: typeof CertificateSerialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/creator/$handle': {
       id: '/creator/$handle'
       path: '/creator/$handle'
@@ -272,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StreamIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/$id': {
+      id: '/studio/$id'
+      path: '/studio/$id'
+      fullPath: '/studio/$id'
+      preLoaderRoute: typeof StudioIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -285,9 +325,11 @@ const rootRouteChildren: RootRouteChildren = {
   RegistryRoute: RegistryRoute,
   VersusRoute: VersusRoute,
   CSlugRoute: CSlugRoute,
+  CertificateSerialRoute: CertificateSerialRoute,
   CreatorHandleRoute: CreatorHandleRoute,
   LiveNewRoute: LiveNewRoute,
   StreamIdRoute: StreamIdRoute,
+  StudioIdRoute: StudioIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

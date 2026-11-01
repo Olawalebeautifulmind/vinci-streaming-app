@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-r
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 
 const searchSchema = z.object({
@@ -21,7 +20,10 @@ export const Route = createFileRoute("/auth")({
       { property: "og:description", content: "Sign in or create your Vinci account." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "description", content: "Sign in or create a Vinci account to bid, vote, chat and gift creators." },
+      {
+        name: "description",
+        content: "Sign in or create a Vinci account to bid, vote, chat and gift creators.",
+      },
     ],
   }),
 });
@@ -52,7 +54,11 @@ function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const parsed = credsSchema.safeParse({ email, password, displayName: mode === "signup" ? displayName : undefined });
+    const parsed = credsSchema.safeParse({
+      email,
+      password,
+      displayName: mode === "signup" ? displayName : undefined,
+    });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
@@ -87,8 +93,14 @@ function AuthPage() {
     setError(null);
     setBusy(true);
     try {
-      const result = await lovable.auth.signInWithOAuth(provider, { redirect_uri: window.location.origin + "/auth" });
-      if (result.error) setError(result.error instanceof Error ? result.error.message : String(result.error));
+      const next = search.redirect ?? "/";
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth?redirect=${encodeURIComponent(next)}`,
+        },
+      });
+      if (error) setError(error.message);
     } catch (err) {
       setError(err instanceof Error ? err.message : "OAuth failed");
     } finally {
@@ -98,13 +110,26 @@ function AuthPage() {
 
   return (
     <div className="mx-auto max-w-md px-6 py-16">
-      <Link to="/" className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground">← Back to Vinci</Link>
+      <Link
+        to="/"
+        className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground"
+      >
+        ← Back to Vinci
+      </Link>
 
       <h1 className="mt-6 font-display text-4xl leading-tight">
-        {mode === "signin" ? "Welcome back." : <>Open your <span className="gold-gradient-text italic">studio.</span></>}
+        {mode === "signin" ? (
+          "Welcome back."
+        ) : (
+          <>
+            Open your <span className="gold-gradient-text italic">studio.</span>
+          </>
+        )}
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        {search.intent ? `Sign in to ${search.intent}.` : "Watching is free. Sign in to bid, vote, chat and gift."}
+        {search.intent
+          ? `Sign in to ${search.intent}.`
+          : "Watching is free. Sign in to bid, vote, chat and gift."}
       </p>
 
       <div className="mt-8 space-y-2">
@@ -125,7 +150,8 @@ function AuthPage() {
       </div>
 
       <div className="my-6 flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-        <span className="h-px flex-1 bg-border" /> or email <span className="h-px flex-1 bg-border" />
+        <span className="h-px flex-1 bg-border" /> or email{" "}
+        <span className="h-px flex-1 bg-border" />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -173,12 +199,18 @@ function AuthPage() {
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
         {mode === "signin" ? (
-          <>New to Vinci?{" "}
-            <button onClick={() => setMode("signup")} className="text-primary hover:underline">Create an account</button>
+          <>
+            New to Vinci?{" "}
+            <button onClick={() => setMode("signup")} className="text-primary hover:underline">
+              Create an account
+            </button>
           </>
         ) : (
-          <>Already a member?{" "}
-            <button onClick={() => setMode("signin")} className="text-primary hover:underline">Sign in</button>
+          <>
+            Already a member?{" "}
+            <button onClick={() => setMode("signin")} className="text-primary hover:underline">
+              Sign in
+            </button>
           </>
         )}
       </p>
