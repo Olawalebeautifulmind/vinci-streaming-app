@@ -1,204 +1,218 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { getCreator, streamsByCreator, getCategory, type PortfolioWork, type CategorySlug } from "../lib/streams";
-import { StreamCard, VerifiedBadge } from "../components/StreamCard";
-
+import { supabase } from "@/integrations/supabase/client";
+import { getCraft } from "@/lib/crafts";
+import { getProfileByHandle, listStreams, listWorks, useLoad } from "@/lib/data";
+import { artistId, memberId, timeAgo } from "@/lib/format";
+import { Avatar, StreamCard, VerifiedBadge } from "@/components/StreamCard";
+import { WorkCard } from "@/components/works";
+import { FollowButton } from "@/components/FollowButton";
 
 export const Route = createFileRoute("/creator/$handle")({
   component: CreatorProfile,
-  loader: ({ params }) => {
-    const creator = getCreator(params.handle);
-    if (!creator) throw notFound();
-    return { creator };
+  loader: async ({ params }) => {
+    const profile = await getProfileByHandle(params.handle).catch(() => null);
+    if (!profile) throw notFound();
+    return { profile };
   },
-  head: ({ loaderData }) => ({
-    meta: loaderData
-      ? [
-          { title: `${loaderData.creator.name} (${loaderData.creator.artistId}) · Vinci` },
-          { name: "description", content: loaderData.creator.bio },
-          { property: "og:title", content: `${loaderData.creator.name} (${loaderData.creator.artistId}) · Vinci` },
-          { property: "og:description", content: loaderData.creator.bio },
-          { property: "og:type", content: "profile" },
-          { name: "twitter:card", content: "summary_large_image" },
-        ]
-      : [],
-  }),
+  head: ({ loaderData }) => {
+    const p = loaderData?.profile;
+    const t = p ? `${p.display_name ?? p.handle} · Vinci` : "Creator · Vinci";
+    return {
+      meta: [
+        { title: t },
+        { name: "description", content: p?.bio ?? "Handmade creator on Vinci." },
+        { property: "og:title", content: t },
+        { property: "og:type", content: "profile" },
+        ...(p?.avatar_url ? [{ property: "og:image", content: p.avatar_url }] : []),
+      ],
+    };
+  },
+  notFoundComponent: () => (
+    <div className="mx-auto max-w-xl px-6 py-32 text-center">
+      <h1 className="font-display text-3xl">No maker with that handle</h1>
+      <Link to="/" className="mt-6 inline-block text-primary">
+        Back to Vinci
+      </Link>
+    </div>
+  ),
 });
 
 function CreatorProfile() {
-  const { creator } = Route.useLoaderData();
-  const live = streamsByCreator(creator.handle);
-  const collected = creator.portfolio.filter((w: PortfolioWork) => w.status === "Collected").length;
-  const available = creator.portfolio.filter((w: PortfolioWork) => w.status === "Available").length;
+  const { profile } = Route.useLoaderData();
+  const live = useLoad(() => listStreams({ creatorId: profile.id, status: "live" }), [profile.id]);
+  const past = useLoad(
+    () => listStreams({ creatorId: profile.id, status: "ended", limit: 6 }),
+    [profile.id],
+  );
+  const works = useLoad(() => listWorks({ creatorId: profile.id }), [profile.id]);
+  const stats = useLoad(
+    async () => (await supabase.rpc("user_stats", { _user: profile.id })).data?.[0] ?? null,
+    [profile.id],
+  );
+  const posts = useLoad(
+    async () =>
+      (
+        await supabase
+          .from("posts")
+          .select("*")
+          .eq("author_id", profile.id)
+          .order("created_at", { ascending: false })
+          .limit(12)
+      ).data ?? [],
+    [profile.id],
+  );
 
-  const accent = creator.portfolio[0]?.thumbAccent ?? "#c9a84c";
-  const base = creator.portfolio[0]?.thumbColor ?? "#1a1208";
+  const craft = getCraft(profile.crafts[0]);
+  const list = works.data ?? [];
+  const collected = list.reduce((n, w) => n + w.editions_sold, 0);
+  const available = list.filter((w) => w.status === "available").length;
+  const location = [profile.city, profile.country_code].filter(Boolean).join(", ");
 
   return (
     <div>
-      {/* Masthead */}
       <section
         className="relative border-b border-border/60 overflow-hidden"
-        style={{ background: `radial-gradient(80% 60% at 20% 0%, ${accent}22 0%, transparent 60%), ${base}` }}
+        style={{
+          background: `radial-gradient(80% 60% at 20% 0%, ${craft?.accent ?? "#c9a84c"}22 0%, transparent 60%), ${craft?.base ?? "#1a1208"}`,
+        }}
       >
         <div className="absolute inset-0 noise opacity-60" />
         <div className="relative mx-auto max-w-7xl px-4 md:px-6 py-12 md:py-16">
-          <Link to="/" className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">← Vinci</Link>
-          <div className="mt-6 grid md:grid-cols-[auto_1fr_auto] gap-8 items-start">
-            <div className="h-28 w-28 md:h-36 md:w-36 rounded-full border border-border shadow-xl" style={{ background: creator.avatar }} />
+          <div className="grid md:grid-cols-[auto_1fr_auto] gap-8 items-start">
+            <Avatar profile={profile} className="h-28 w-28 md:h-36 md:w-36 text-4xl" />
             <div className="min-w-0">
-              <div className="text-[11px] font-mono uppercase tracking-widest text-primary">{creator.artistId}</div>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-primary">
+                {profile.is_creator
+                  ? artistId(profile.member_no, profile.country_code)
+                  : memberId(profile.member_no)}
+              </div>
               <h1 className="mt-2 font-display text-4xl md:text-6xl leading-[0.95] tracking-tight">
-                {creator.name}
-                {creator.verified && <span className="ml-3 inline-flex align-middle"><VerifiedBadge /></span>}
+                {profile.display_name ?? profile.handle}
+                {profile.verified && (
+                  <span className="ml-3 inline-flex align-middle">
+                    <VerifiedBadge />
+                  </span>
+                )}
               </h1>
-              <div className="mt-2 text-sm text-muted-foreground">@{creator.handle}</div>
-              <p className="mt-5 max-w-2xl text-base text-foreground/90 leading-relaxed">{creator.bio}</p>
-              <div className="mt-5 flex flex-wrap items-center gap-2">
-                {creator.disciplines.map((d: CategorySlug) => {
-                  const cat = getCategory(d);
-                  return cat ? (
-                    <Link key={d} to="/c/$slug" params={{ slug: d }} className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary/60">
-                      {cat.emoji} {cat.name}
+              <div className="mt-2 text-sm text-muted-foreground">@{profile.handle}</div>
+              {profile.bio && (
+                <p className="mt-5 max-w-2xl text-base text-foreground/90 leading-relaxed">
+                  {profile.bio}
+                </p>
+              )}
+              <div className="mt-5 flex flex-wrap gap-2">
+                {profile.crafts.map((c: string) => {
+                  const cr = getCraft(c);
+                  return cr ? (
+                    <Link
+                      key={c}
+                      to="/c/$slug"
+                      params={{ slug: c }}
+                      className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary/60"
+                    >
+                      {cr.emoji} {cr.name}
                     </Link>
                   ) : null;
                 })}
-                <span className="rounded-full bg-primary/10 text-primary border border-primary/30 px-3 py-1 text-xs">{creator.skillLevel}</span>
               </div>
             </div>
-            <div className="flex gap-2 md:flex-col">
-              <button className="h-10 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-accent">Follow</button>
-              <button className="h-10 rounded-md border border-border px-5 text-sm hover:border-primary/60">Commission</button>
-            </div>
+            <FollowButton creatorId={profile.id} />
           </div>
-
-          {/* Identity strip */}
           <div className="mt-10 grid grid-cols-2 md:grid-cols-5 gap-px bg-border/60 border border-border/60 rounded-lg overflow-hidden text-sm">
-            <Stat label="Location" value={`${creator.city}, ${creator.country}`} sub={creator.continent} />
-            <Stat label="Followers" value={creator.followers.toLocaleString()} sub={`Since ${creator.joinedYear}`} />
-            <Stat label="Works minted" value={String(creator.portfolio.length)} sub={`${collected} collected · ${available} available`} />
-            <Stat label="Wallet" value={creator.walletShort} sub="Verified on-chain" />
-            <Stat label="Registry" value={creator.artistId} sub={creator.registryAddress} mono />
+            <Stat label="Location" value={location || "—"} />
+            <Stat label="Followers" value={String(stats.data?.followers ?? 0)} />
+            <Stat
+              label="Streams"
+              value={String(stats.data?.streams_hosted ?? 0)}
+              sub={`${stats.data?.minutes_streamed ?? 0} min live`}
+            />
+            <Stat
+              label="Works"
+              value={String(list.length)}
+              sub={`${collected} collected · ${available} available`}
+            />
+            <Stat
+              label="Versus wins"
+              value={String(stats.data?.versus_wins ?? 0)}
+              sub={`${stats.data?.xp ?? 0} XP`}
+            />
           </div>
         </div>
       </section>
 
       <div className="mx-auto max-w-7xl px-4 md:px-6 py-12 space-y-16">
-        {/* Live now */}
-        {live.length > 0 && (
+        {(live.data?.length ?? 0) > 0 && (
           <section>
-            <div className="flex items-end justify-between mb-6">
-              <h2 className="font-display text-2xl md:text-3xl">Live now</h2>
-              <span className="text-xs uppercase tracking-widest text-muted-foreground">{live.length} active stream{live.length > 1 ? "s" : ""}</span>
-            </div>
+            <h2 className="font-display text-2xl md:text-3xl mb-6">Live now</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
-              {live.map(s => <StreamCard key={s.id} stream={s} />)}
+              {live.data!.map((s) => (
+                <StreamCard key={s.id} stream={s} />
+              ))}
             </div>
           </section>
         )}
 
-        {/* Artistic Ownership Registry */}
         <section>
-          <div className="flex items-end justify-between mb-6 flex-wrap gap-2">
-            <div>
-              <div className="text-[11px] uppercase tracking-widest text-primary">Artistic Ownership Registry</div>
-              <h2 className="mt-1 font-display text-2xl md:text-3xl">Verified portfolio of {creator.name.split(" ")[0]}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Every work minted to <span className="font-mono text-foreground">{creator.artistId}</span> on Base · ERC-721.</p>
+          <div className="text-[11px] uppercase tracking-widest text-primary">
+            Artistic Ownership Registry
+          </div>
+          <h2 className="mt-1 font-display text-2xl md:text-3xl mb-6">Works</h2>
+          {list.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No works listed yet.</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {list.map((w) => (
+                <WorkCard key={w.id} work={w} onChanged={() => void works.reload()} />
+              ))}
             </div>
-            <div className="text-xs text-muted-foreground font-mono">{creator.registryAddress}</div>
-          </div>
+          )}
+        </section>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {creator.portfolio.map((w: PortfolioWork) => (
-              <article key={w.id} className="group rounded-lg border border-border overflow-hidden bg-card">
-                <div
-                  className="relative aspect-[4/3]"
-                  style={{ background: `radial-gradient(120% 80% at 30% 20%, ${w.thumbAccent}33 0%, transparent 60%), ${w.thumbColor}` }}
+        {(posts.data?.length ?? 0) > 0 && (
+          <section>
+            <h2 className="font-display text-2xl mb-6">Posts</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {posts.data!.map((p) => (
+                <article
+                  key={p.id}
+                  className="rounded-lg border border-border overflow-hidden bg-card"
                 >
-                  <div className="absolute inset-0 noise opacity-70" />
-                  <div className="absolute inset-0 flex items-end p-4">
-                    <span className="font-display text-2xl leading-none" style={{ color: w.thumbAccent }}>{w.title}</span>
-                  </div>
-                  <div className="absolute top-3 left-3 rounded-sm bg-black/70 px-2 py-0.5 text-[10px] font-mono text-white/90">{w.tokenId}</div>
-                  <div className="absolute top-3 right-3">
-                    <StatusPill status={w.status} />
-                  </div>
-                </div>
-                <div className="p-4">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{w.medium}</span>
-                    <span>{w.year}</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="text-sm">
-                      {w.priceCowries != null ? (
-                        <span className="font-display">{w.priceCowries.toLocaleString()} 🐚</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                  {p.image_url && (
+                    <img src={p.image_url} alt="" className="aspect-square w-full object-cover" />
+                  )}
+                  <div className="p-4">
+                    <p className="text-sm whitespace-pre-line">{p.body}</p>
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-2">
+                      {timeAgo(p.created_at)}
                     </div>
-                    {w.collector && (
-                      <div className="text-[11px] text-muted-foreground">held by <span className="text-foreground">{w.collector}</span></div>
-                    )}
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
 
-        {/* About / identity */}
-        <section className="grid lg:grid-cols-2 gap-6">
-          <div className="rounded-lg border border-border p-6">
-            <h3 className="font-display text-lg">Identity</h3>
-            <dl className="mt-4 grid grid-cols-2 gap-y-4 text-sm">
-              <Row label="Artist ID" value={creator.artistId} mono />
-              <Row label="Skill level" value={creator.skillLevel} />
-              <Row label="City" value={creator.city} />
-              <Row label="Country" value={`${creator.country} (${creator.countryCode})`} />
-              <Row label="Continent" value={creator.continent} />
-              <Row label="Joined" value={String(creator.joinedYear)} />
-            </dl>
-          </div>
-          <div className="rounded-lg border border-border p-6">
-            <h3 className="font-display text-lg">On-chain</h3>
-            <dl className="mt-4 grid grid-cols-2 gap-y-4 text-sm">
-              <Row label="Wallet" value={creator.walletShort} mono />
-              <Row label="Chain" value="Base · ERC-721" />
-              <Row label="Registry" value={creator.registryAddress} mono />
-              <Row label="Royalty" value="10%" />
-              <Row label="Works minted" value={String(creator.portfolio.length)} />
-              <Row label="Verified" value={creator.verified ? "Yes" : "Pending"} />
-            </dl>
-          </div>
-        </section>
+        {(past.data?.length ?? 0) > 0 && (
+          <section>
+            <h2 className="font-display text-2xl mb-6">Past streams</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+              {past.data!.map((s) => (
+                <StreamCard key={s.id} stream={s} />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, sub, mono = false }: { label: string; value: string; sub?: string; mono?: boolean }) {
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="bg-background p-4">
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
-      <div className={`mt-1 ${mono ? "font-mono text-sm" : "font-display text-base"}`}>{value}</div>
+      <div className="mt-1 font-display text-base truncate">{value}</div>
       {sub && <div className="text-[11px] text-muted-foreground mt-0.5 truncate">{sub}</div>}
     </div>
   );
-}
-
-function Row({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className={mono ? "font-mono text-foreground" : "text-foreground"}>{value}</dd>
-    </>
-  );
-}
-
-function StatusPill({ status }: { status: "Collected" | "Available" | "Archived" }) {
-  const styles =
-    status === "Available" ? "bg-primary text-primary-foreground" :
-    status === "Collected" ? "bg-black/70 text-primary border border-primary/40" :
-    "bg-black/70 text-white/60";
-  return <span className={`rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold ${styles}`}>{status}</span>;
 }

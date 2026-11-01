@@ -9,7 +9,12 @@ type AuthCtx = {
   signOut: () => Promise<void>;
 };
 
-const Ctx = createContext<AuthCtx>({ user: null, session: null, loading: true, signOut: async () => {} });
+const Ctx = createContext<AuthCtx>({
+  user: null,
+  session: null,
+  loading: true,
+  signOut: async () => {},
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -17,7 +22,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Set up listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setLoading(false);
     });
@@ -47,7 +54,8 @@ export function useRequireAuth() {
   const { user } = useAuth();
   return (intent?: string) => {
     if (user) return true;
-    const next = typeof window !== "undefined" ? window.location.pathname + window.location.search : "/";
+    const next =
+      typeof window !== "undefined" ? window.location.pathname + window.location.search : "/";
     window.location.href = `/auth?redirect=${encodeURIComponent(next)}${intent ? `&intent=${encodeURIComponent(intent)}` : ""}`;
     return false;
   };
